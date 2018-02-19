@@ -21,7 +21,7 @@ describe("PropertyChanges", function () {
         });
         object.x = 10;
         expect(object.x).toEqual(10);
-        
+
         var argsForCall = spy.calls.all().map(function (call) { return call.args });
         expect(argsForCall).toEqual([
             ['from', undefined, 'x'],
@@ -29,7 +29,97 @@ describe("PropertyChanges", function () {
         ]);
     });
 
+
+    it("observes setter on typed object", function () {
+        var spyA = jasmine.createSpy();
+        var Type = function Type(){};
+        var objectA = new Type;
+        PropertyChanges.addBeforeOwnPropertyChangeListener(objectA, 'x', function (value, key) {
+            spyA('from', value, key);
+        });
+        PropertyChanges.addOwnPropertyChangeListener(objectA, 'x', function (value, key) {
+            spyA('to', value, key);
+        });
+        objectA.x = 10;
+        expect(objectA.x).toEqual(10);
+
+        var argsForCall = spyA.calls.all().map(function (call) { return call.args });
+        expect(argsForCall).toEqual([
+            ['from', undefined, 'x'],
+            ['to', 10, 'x'],
+        ]);
+
+        var spyB = jasmine.createSpy();
+        var objectB = new Type;
+        PropertyChanges.addBeforeOwnPropertyChangeListener(objectB, 'x', function (value, key) {
+            spyB('from', value, key);
+        });
+        PropertyChanges.addOwnPropertyChangeListener(objectB, 'x', function (value, key) {
+            spyB('to', value, key);
+        });
+        objectB.x = 20;
+        expect(objectB.x).toEqual(20);
+
+        var argsForCallB = spyB.calls.all().map(function (call) { return call.args });
+        expect(argsForCallB).toEqual([
+            ['from', undefined, 'x'],
+            ['to', 20, 'x'],
+        ]);
+        //console.log("objectB.x is ",objectB.x," objectA.x = ",objectA.x);
+
+    });
+
+
     it("observes setter on object with getter/setter", function () {
+        spy = jasmine.createSpy();
+        var value;
+        var Type = function Type(){};
+        Object.defineProperties(Type.prototype, {
+            _x: {
+                value: 10,
+                writable: true
+            },
+            x: {
+                get: function () {
+                    return this._x;
+                },
+                set: function (_value) {
+                    this._x = _value;
+                },
+                enumerable: false,
+                configurable: true
+            },
+            shouldMakePropertyObservableOnPrototype: {
+                value: function(key) {
+                    return key === "x" ? true : false;
+                }
+            }
+
+        });
+        var SubType = function SubType(){};
+        SubType.prototype = new Type;
+        SubType.prototype.constructor = SubType;
+
+        var object = new SubType;
+
+        PropertyChanges.addBeforeOwnPropertyChangeListener(object, 'x', function (value, key) {
+            spy('from', value, key);
+        });
+        PropertyChanges.addOwnPropertyChangeListener(object, 'x', function (value, key) {
+            spy('to', value, key);
+        });
+        object.x = 20;
+        expect(object.x).toEqual(20);
+
+        var argsForCall = spy.calls.all().map(function (call) { return call.args });
+        expect(argsForCall).toEqual([
+            ['from', 10, 'x'],
+            ['to', 20, 'x'], // reports no change
+        ]);
+    });
+
+
+    it("observes setter on typed object with getter/setter", function () {
         spy = jasmine.createSpy();
         var value;
         var object = Object.create(Object.prototype, {
@@ -63,6 +153,7 @@ describe("PropertyChanges", function () {
             ['to', 20, 'x'], // reports no change
         ]);
     });
+
 
     it("shouldn't call the listener if the new value is the same after calling the object setter", function () {
         spy = jasmine.createSpy();
